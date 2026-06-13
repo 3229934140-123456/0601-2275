@@ -224,10 +224,20 @@ export default function ReportPreview() {
         <div className="flex items-center gap-3">
           <button
             onClick={generatePDF}
-            className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all font-medium text-sm"
+            disabled={pdfGenerating}
+            className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FileText className="w-4 h-4" />
-            生成PDF
+            {pdfGenerating ? (
+              <>
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                生成中...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4" />
+                生成PDF
+              </>
+            )}
           </button>
           <button
             onClick={handleExport}
@@ -239,7 +249,7 @@ export default function ReportPreview() {
         </div>
       </div>
       
-      <div className="bg-white rounded-xl shadow-card p-6">
+      <div ref={reportRef} className="bg-white rounded-xl shadow-card p-6">
         <div className="border-b border-slate-100 pb-4 mb-6">
           <h3 className="text-lg font-bold text-slate-800 mb-1">肿瘤生长模拟报告</h3>
           <p className="text-sm text-slate-500">
@@ -311,6 +321,39 @@ export default function ReportPreview() {
           <div>
             <h4 className="font-medium text-slate-800 mb-3">坏死核心比例变化</h4>
             <EChartsChart option={necrosisChartOption} style={{ height: '280px' }} />
+          </div>
+        </div>
+        
+        <div className="mb-8">
+          <h4 className="font-medium text-slate-800 mb-3">三维形态预览（最终状态）</h4>
+          <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div 
+                className="w-56 h-56 rounded-full bg-gradient-to-br from-red-400 via-orange-400 to-yellow-400 opacity-80"
+                style={{ 
+                  transform: `scale(${0.5 + report.summary.finalVolume / 50})`,
+                  boxShadow: '0 0 60px rgba(255, 100, 50, 0.5)'
+                }}
+              />
+              <div 
+                className="absolute w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 opacity-90"
+                style={{ 
+                  transform: `scale(${0.3 + report.summary.maxNecrosisRatio * 2})`,
+                }}
+              />
+            </div>
+            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 text-sm">
+              <p className="text-slate-500 text-xs">最终切片</p>
+              <p className="font-semibold text-slate-800">第 {report.summary.simulationDays} 天 · 横截面</p>
+            </div>
+            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 text-xs">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-red-500" />
+                <span className="text-slate-600">高增殖区</span>
+                <div className="w-3 h-3 rounded-full bg-slate-600 ml-3" />
+                <span className="text-slate-600">坏死核心</span>
+              </div>
+            </div>
           </div>
         </div>
         

@@ -42,6 +42,7 @@ function createMockTask(id: string, status: SimulationTask['status'], patient: P
     updatedAt: Date.now() - Math.random() * 24 * 60 * 60 * 1000,
     cellParams,
     imageName: 'pathology_sample_' + id + '.dcm',
+    initialVolume,
     currentVolume: initialVolume,
     necrosisRatio: 0.05 + Math.random() * 0.1,
     baselineGrowthRate: 0.8 + Math.random() * 1.2,
@@ -149,6 +150,8 @@ export function createTask(patientData: Omit<Patient, 'id'>, cellParams: CellPar
     id: 'P' + (1000 + tasks.length + 1),
   };
   
+  const initialVolume = 12.5;
+  
   const task: SimulationTask = {
     id: 'TASK-' + (1000 + tasks.length + 1),
     patient,
@@ -157,7 +160,8 @@ export function createTask(patientData: Omit<Patient, 'id'>, cellParams: CellPar
     updatedAt: Date.now(),
     cellParams,
     imageName: imageName || '未上传',
-    currentVolume: 12.5,
+    initialVolume,
+    currentVolume: initialVolume,
     necrosisRatio: 0.05,
     baselineGrowthRate: (cellParams.proliferationRate - cellParams.apoptosisRate) * 0.5,
     alerts: [],
@@ -420,7 +424,7 @@ export function updateTreatmentPlan(taskId: string, treatmentPlan: TreatmentPlan
     task.status = 'growth_calculating';
     task.updatedAt = Date.now();
     
-    const simData = runSimulation(task.cellParams, task.currentVolume, task.simulationDays, task.treatmentPlan);
+    const simData = runSimulation(task.cellParams, task.initialVolume, task.simulationDays, task.treatmentPlan);
     task.simulationData = simData;
     task.currentVolume = simData.volumes[simData.volumes.length - 1];
     task.necrosisRatio = simData.necrosisRatios[simData.necrosisRatios.length - 1];

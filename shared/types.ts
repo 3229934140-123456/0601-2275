@@ -96,6 +96,7 @@ export interface SimulationTask {
   cellParams: CellParams;
   imageUrl?: string;
   imageName?: string;
+  initialVolume: number;
   currentVolume: number;
   necrosisRatio: number;
   baselineGrowthRate: number;

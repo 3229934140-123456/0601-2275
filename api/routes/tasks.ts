@@ -83,7 +83,7 @@ router.post('/:id/progress', (req: Request, res: Response) => {
   if (step === 'model_done') {
     const updated = updateTaskStatus(req.params.id, 'growth_calculating');
     
-    const simData = runSimulation(task.cellParams, task.currentVolume, task.simulationDays, task.treatmentPlan);
+    const simData = runSimulation(task.cellParams, task.initialVolume, task.simulationDays, task.treatmentPlan);
     
     if (updated) {
       updated.simulationData = simData;
