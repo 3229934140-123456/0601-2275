@@ -240,7 +240,9 @@ router.get('/:id/export', (req: Request, res: Response) => {
     }
   }
   
-  const versionLabel = treatmentVersion ? `v${treatmentVersion}` : 'latest';
+  const versionLabel = treatmentVersion ? `_v${treatmentVersion}` : '';
+  const stageLabel = stage ? `_${stage}` : '';
+  const fileNameBase = `${task.patient.name}_${task.id}${versionLabel}${stageLabel}`;
   
   if (format === 'csv') {
     const sim = data as typeof simData;
@@ -250,11 +252,12 @@ router.get('/:id/export', (req: Request, res: Response) => {
     ).join('\n');
     
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${task.id}_growth_${versionLabel}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileNameBase}_growth_data.csv"`);
     res.send(csvHeader + csvRows);
     return;
   }
   
+  res.setHeader('Content-Disposition', `attachment; filename="${fileNameBase}_growth_data.json"`);
   res.json({
     taskId: task.id,
     patient: { name: task.patient.name, cancerType: task.patient.cancerType, stage: task.patient.stage },

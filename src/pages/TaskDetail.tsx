@@ -133,7 +133,18 @@ export default function TaskDetail() {
     };
     await adjustTreatment(id, plan, adjustReason);
     setTreatmentModalOpen(false);
-    startRealtimeSimulation();
+    
+    if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+      simIntervalRef.current = null;
+    }
+    
+    setSimulationDay(0);
+    setIsSimulating(false);
+    
+    setTimeout(() => {
+      startRealtimeSimulation();
+    }, 100);
   };
   
   const addChemoPlan = () => {

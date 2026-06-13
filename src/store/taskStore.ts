@@ -16,7 +16,7 @@ interface TaskStore {
   createTask: (data: unknown) => Promise<SimulationTask>;
   startTask: (id: string) => Promise<void>;
   advanceTask: (id: string, step: string) => Promise<void>;
-  reviewAlert: (taskId: string, alertId: string, result: 'adjust_treatment' | 'continue', reviewer: string) => Promise<void>;
+  reviewAlert: (taskId: string, alertId: string, result: 'adjust_treatment' | 'continue', reviewer: string) => Promise<boolean>;
   adjustTreatment: (taskId: string, treatmentPlan: unknown, reason: string) => Promise<void>;
   
   fetchAlerts: (filters?: { reviewed?: boolean; level?: string }) => Promise<void>;
@@ -147,20 +147,29 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       
       set(state => {
         const currentTask = state.currentTask;
+        let updatedTask = currentTask;
+        
         if (currentTask && currentTask.id === taskId) {
-          const updatedTask = {
+          updatedTask = {
             ...currentTask,
             alerts: currentTask.alerts.map(a => a.id === alertId ? alert : a),
           };
-          return {
-            currentTask: updatedTask,
-            tasks: state.tasks.map(t => t.id === taskId ? updatedTask : t),
-          };
         }
-        return state;
+        
+        return {
+          currentTask: updatedTask,
+          tasks: state.tasks.map(t => t.id === taskId 
+            ? (updatedTask || { ...t, alerts: t.alerts.map(a => a.id === alertId ? alert : a) })
+            : t
+          ),
+          alerts: state.alerts.map(a => a.id === alertId ? alert : a),
+        };
       });
+      
+      return result === 'adjust_treatment';
     } catch (e) {
       set({ error: (e as Error).message });
+      return false;
     }
   },
   
@@ -290,14 +299,19 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       const res = await fetch(`${API_BASE}/tasks/${taskId}/export?${params.toString()}`);
       if (!res.ok) throw new Error('导出失败');
       
-      const versionLabel = treatmentVersion && treatmentVersion !== 'latest' ? `_v${treatmentVersion}` : '';
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let fileName = '';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) fileName = match[1];
+      }
       
       if (format === 'csv') {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${taskId}_growth_data${versionLabel}.csv`;
+        a.download = fileName || `${taskId}_growth_data.csv`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -306,7 +320,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${taskId}_growth_data${versionLabel}.json`;
+        a.download = fileName || `${taskId}_growth_data.json`;
         a.click();
         URL.revokeObjectURL(url);
       }

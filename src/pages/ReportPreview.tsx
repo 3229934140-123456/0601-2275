@@ -50,7 +50,14 @@ export default function ReportPreview() {
   };
   
   const generatePDF = async () => {
-    if (!reportRef.current || !report) return;
+    if (!report) return;
+    
+    if (!report.simulationData || !report.simulationData.timeline || report.simulationData.timeline.length === 0) {
+      alert('当前任务还没有完整的模拟结果，请先完成模拟流程后再生成报告。');
+      return;
+    }
+    
+    if (!reportRef.current) return;
     
     setPdfGenerating(true);
     try {
@@ -86,7 +93,8 @@ export default function ReportPreview() {
         heightLeft -= pageHeight - 20;
       }
       
-      const fileName = `${report.patient.name}_${report.taskId}_模拟报告.pdf`;
+      const versionLabel = report.treatmentPlan?.version ? `_v${report.treatmentPlan.version}` : '';
+      const fileName = `${report.patient.name}_${report.taskId}${versionLabel}_模拟报告.pdf`;
       pdf.save(fileName);
     } catch (e) {
       console.error('PDF生成失败:', e);

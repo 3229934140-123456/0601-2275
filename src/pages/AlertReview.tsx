@@ -26,8 +26,11 @@ export default function AlertReview() {
     fetchAlerts({ reviewed, level });
   };
   
-  const handleReview = (alert: AlertWithPatient, result: 'adjust_treatment' | 'continue') => {
-    reviewAlert(alert.taskId, alert.id, result, '李医生');
+  const handleReview = async (alert: AlertWithPatient, result: 'adjust_treatment' | 'continue') => {
+    const shouldNavigate = await reviewAlert(alert.taskId, alert.id, result, '李医生');
+    if (shouldNavigate) {
+      navigate(`/tasks/${alert.taskId}`);
+    }
   };
   
   const filteredAlerts = alerts as AlertWithPatient[];
