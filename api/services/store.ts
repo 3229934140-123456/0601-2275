@@ -399,6 +399,18 @@ export function getDashboardStats() {
 export function updateTreatmentPlan(taskId: string, treatmentPlan: TreatmentPlan): SimulationTask | undefined {
   const task = tasks.find(t => t.id === taskId);
   if (task) {
+    if (task.simulationData && task.treatmentPlan) {
+      if (!task.simulationHistory) {
+        task.simulationHistory = [];
+      }
+      task.simulationHistory.push({
+        version: task.treatmentPlan.version,
+        treatmentPlan: { ...task.treatmentPlan },
+        simulationData: { ...task.simulationData },
+        createdAt: task.updatedAt,
+      });
+    }
+    
     task.treatmentPlan = {
       ...treatmentPlan,
       version: (task.treatmentPlan?.version || 0) + 1,
@@ -412,6 +424,32 @@ export function updateTreatmentPlan(taskId: string, treatmentPlan: TreatmentPlan
     task.simulationData = simData;
     task.currentVolume = simData.volumes[simData.volumes.length - 1];
     task.necrosisRatio = simData.necrosisRatios[simData.necrosisRatios.length - 1];
+    
+    const maxNecrosis = Math.max(...simData.necrosisRatios);
+    if (maxNecrosis > 0.3) {
+      task.alerts.push({
+        id: genId(),
+        taskId,
+        type: 'necrosis_worsen',
+        level: maxNecrosis > 0.5 ? 'danger' : 'warning',
+        message: `新方案下坏死核心比例仍较高，最高达 ${(maxNecrosis * 100).toFixed(1)}%，超过预警阈值 30%`,
+        createdAt: Date.now(),
+        reviewed: false,
+      });
+    }
+    
+    const finalGrowthRate = simData.growthRates[simData.growthRates.length - 1];
+    if (Math.abs(finalGrowthRate) > task.baselineGrowthRate * 1.2) {
+      task.alerts.push({
+        id: genId(),
+        taskId,
+        type: 'volume_spike',
+        level: Math.abs(finalGrowthRate) > task.baselineGrowthRate * 1.5 ? 'danger' : 'warning',
+        message: `新方案下体积增长率${finalGrowthRate > 0 ? '仍偏高' : '下降明显'}，当前增长率: ${finalGrowthRate.toFixed(2)}%/天`,
+        createdAt: Date.now(),
+        reviewed: false,
+      });
+    }
     
     return task;
   }

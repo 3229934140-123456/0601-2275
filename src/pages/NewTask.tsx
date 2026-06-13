@@ -64,6 +64,7 @@ export default function NewTask() {
         patient: patientForm,
         cellParams,
         simulationDays,
+        imageName: uploadedFile || undefined,
       });
       navigate(`/tasks/${task.id}`);
     } catch (e) {

@@ -9,6 +9,7 @@ import {
   Clock,
   User,
   FileText,
+  FileImage,
   Download,
   RefreshCw,
   Check,
@@ -387,6 +388,28 @@ export default function TaskDetail() {
               )}
             </div>
           ))}
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-xl shadow-card p-5">
+        <h3 className="font-semibold text-slate-800 mb-4">病理影像信息</h3>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center">
+            <FileImage className="w-8 h-8 text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-slate-800">
+              {currentTask.imageName || '未上传病理影像'}
+            </p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {currentTask.imageName ? '用于模型构建已关联此影像数据' : '上传病理影像后将自动关联'}
+            </p>
+          </div>
+          {currentTask.imageName && (
+            <span className="px-3 py-1 bg-success/10 text-success text-xs font-medium rounded-full">
+              已绑定
+            </span>
+          )}
         </div>
       </div>
       

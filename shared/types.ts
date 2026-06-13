@@ -102,6 +102,12 @@ export interface SimulationTask {
   alerts: Alert[];
   treatmentPlan?: TreatmentPlan;
   simulationData?: SimulationData;
+  simulationHistory?: {
+    version: number;
+    treatmentPlan: TreatmentPlan;
+    simulationData: SimulationData;
+    createdAt: number;
+  }[];
   simulationDays: number;
   deviationCount: number;
   paused: boolean;
@@ -155,6 +161,7 @@ export interface DashboardStats {
 export interface ReportData {
   taskId: string;
   patient: Patient;
+  imageName?: string;
   summary: {
     initialVolume: number;
     finalVolume: number;
@@ -164,6 +171,12 @@ export interface ReportData {
   };
   simulationData: SimulationData;
   treatmentPlan?: TreatmentPlan;
+  simulationHistory: {
+    version: number;
+    treatmentPlan: TreatmentPlan;
+    simulationData: SimulationData;
+    createdAt: number;
+  }[];
   generatedAt: number;
 }
 

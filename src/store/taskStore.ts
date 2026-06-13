@@ -30,7 +30,7 @@ interface TaskStore {
   fetchDashboardStats: () => Promise<void>;
   
   fetchReport: (taskId: string) => Promise<ReportData | null>;
-  exportData: (taskId: string, format: string, stage?: string) => Promise<void>;
+  exportData: (taskId: string, format: string, stage?: string, treatmentVersion?: string | number) => Promise<void>;
   
   setCurrentTask: (task: SimulationTask | null) => void;
 }
@@ -280,21 +280,24 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
   
-  exportData: async (taskId, format, stage) => {
+  exportData: async (taskId, format, stage, treatmentVersion) => {
     try {
       const params = new URLSearchParams();
       params.set('format', format);
       if (stage) params.set('stage', stage);
+      if (treatmentVersion && treatmentVersion !== 'latest') params.set('treatmentVersion', String(treatmentVersion));
       
       const res = await fetch(`${API_BASE}/tasks/${taskId}/export?${params.toString()}`);
       if (!res.ok) throw new Error('导出失败');
+      
+      const versionLabel = treatmentVersion && treatmentVersion !== 'latest' ? `_v${treatmentVersion}` : '';
       
       if (format === 'csv') {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${taskId}_growth_data.csv`;
+        a.download = `${taskId}_growth_data${versionLabel}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -303,7 +306,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${taskId}_growth_data.json`;
+        a.download = `${taskId}_growth_data${versionLabel}.json`;
         a.click();
         URL.revokeObjectURL(url);
       }

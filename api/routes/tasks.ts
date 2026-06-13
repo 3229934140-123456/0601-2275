@@ -44,14 +44,14 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 router.post('/', (req: Request, res: Response) => {
-  const { patient, cellParams, simulationDays } = req.body as CreateTaskRequest;
+  const { patient, cellParams, simulationDays, imageName } = req.body as CreateTaskRequest & { imageName?: string };
   
   if (!patient || !cellParams || !simulationDays) {
     res.status(400).json({ error: '缺少必要参数' });
     return;
   }
   
-  const task = createTask(patient, cellParams, simulationDays, 'pathology_upload.png');
+  const task = createTask(patient, cellParams, simulationDays, imageName);
   res.status(201).json(task);
 });
 
@@ -97,6 +97,17 @@ router.post('/:id/progress', (req: Request, res: Response) => {
         type: 'volume_spike',
         level: Math.abs(growthRate) > task.baselineGrowthRate * 1.5 ? 'danger' : 'warning',
         message: `肿瘤体积增长率${growthRate > 0 ? '上升' : '下降'}较快，当前增长率: ${growthRate.toFixed(2)}%/天，超出基线${task.baselineGrowthRate.toFixed(2)}%的1.2倍`,
+      });
+    }
+    
+    const maxNecrosis = Math.max(...simData.necrosisRatios);
+    const necrosisThreshold = 0.3;
+    if (maxNecrosis > necrosisThreshold) {
+      const baselineNecrosis = 0.2;
+      addAlert(req.params.id, {
+        type: 'necrosis_worsen',
+        level: maxNecrosis > 0.5 ? 'danger' : 'warning',
+        message: `坏死核心比例持续上升，最高达 ${(maxNecrosis * 100).toFixed(1)}%，${maxNecrosis > 0.5 ? '已远超' : '已超过'}预警阈值 30%，需关注肿瘤内部微环境变化`,
       });
     }
     
@@ -168,6 +179,7 @@ router.get('/:id/report', (req: Request, res: Response) => {
   const report = {
     taskId: task.id,
     patient: task.patient,
+    imageName: task.imageName,
     summary: {
       initialVolume: volumes[0],
       finalVolume: volumes[volumes.length - 1],
@@ -177,6 +189,7 @@ router.get('/:id/report', (req: Request, res: Response) => {
     },
     simulationData: task.simulationData,
     treatmentPlan: task.treatmentPlan,
+    simulationHistory: task.simulationHistory || [],
     generatedAt: Date.now(),
   };
   
@@ -190,9 +203,21 @@ router.get('/:id/export', (req: Request, res: Response) => {
     return;
   }
   
-  const { format = 'json', stage } = req.query;
+  const { format = 'json', stage, treatmentVersion } = req.query;
   
-  let data: unknown = task.simulationData;
+  let simData = task.simulationData;
+  let currentTreatmentPlan = task.treatmentPlan;
+  
+  if (treatmentVersion && task.simulationHistory) {
+    const version = parseInt(String(treatmentVersion));
+    const historyItem = task.simulationHistory.find(h => h.version === version);
+    if (historyItem) {
+      simData = historyItem.simulationData;
+      currentTreatmentPlan = historyItem.treatmentPlan;
+    }
+  }
+  
+  let data: unknown = simData;
   
   if (stage) {
     const stageDays: Record<string, [number, number]> = {
@@ -204,7 +229,7 @@ router.get('/:id/export', (req: Request, res: Response) => {
     const range = stageDays[String(stage)];
     if (range) {
       const [start, end] = range;
-      const sim = task.simulationData;
+      const sim = simData;
       data = {
         timeline: sim.timeline.filter(t => t >= start && t <= end),
         volumes: sim.volumes.slice(start, end + 1),
@@ -215,15 +240,17 @@ router.get('/:id/export', (req: Request, res: Response) => {
     }
   }
   
+  const versionLabel = treatmentVersion ? `v${treatmentVersion}` : 'latest';
+  
   if (format === 'csv') {
-    const sim = data as typeof task.simulationData;
+    const sim = data as typeof simData;
     const csvHeader = 'day,volume_cm3,necrosis_ratio,growth_rate_pct\n';
     const csvRows = sim.timeline.map((day, i) => 
       `${day},${sim.volumes[i]},${sim.necrosisRatios[i]},${sim.growthRates[i]}`
     ).join('\n');
     
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${task.id}_growth_data.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${task.id}_growth_${versionLabel}.csv"`);
     res.send(csvHeader + csvRows);
     return;
   }
@@ -232,10 +259,11 @@ router.get('/:id/export', (req: Request, res: Response) => {
     taskId: task.id,
     patient: { name: task.patient.name, cancerType: task.patient.cancerType, stage: task.patient.stage },
     stage: stage || 'all',
-    treatmentPlan: task.treatmentPlan ? {
-      version: task.treatmentPlan.version,
-      chemotherapy: task.treatmentPlan.chemotherapy.map(c => ({ drug: c.drug, dose: c.dose })),
-      radiotherapy: task.treatmentPlan.radiotherapy.map(r => ({ dose: r.dose, fractions: r.fractions })),
+    treatmentVersion: treatmentVersion || 'latest',
+    treatmentPlan: currentTreatmentPlan ? {
+      version: currentTreatmentPlan.version,
+      chemotherapy: currentTreatmentPlan.chemotherapy.map(c => ({ drug: c.drug, dose: c.dose })),
+      radiotherapy: currentTreatmentPlan.radiotherapy.map(r => ({ dose: r.dose, fractions: r.fractions })),
     } : null,
     data,
     exportedAt: Date.now(),

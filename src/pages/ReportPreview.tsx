@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import EChartsChart from '../components/EChartsChart';
 import { 
@@ -11,7 +11,10 @@ import {
   User,
   Layers,
   TrendingUp,
+  FileImage,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useTaskStore } from '../store/taskStore';
 import type { ReportData } from '@shared/types';
 
@@ -19,10 +22,13 @@ export default function ReportPreview() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { fetchReport, exportData } = useTaskStore();
+  const reportRef = useRef<HTMLDivElement>(null);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportStage, setExportStage] = useState<string>('all');
   const [exportFormat, setExportFormat] = useState<string>('json');
+  const [exportVersion, setExportVersion] = useState<string>('latest');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -39,12 +45,55 @@ export default function ReportPreview() {
   
   const handleExport = () => {
     if (id) {
-      exportData(id, exportFormat, exportStage === 'all' ? undefined : exportStage);
+      exportData(id, exportFormat, exportStage === 'all' ? undefined : exportStage, exportVersion);
     }
   };
   
-  const generatePDF = () => {
-    alert('PDF报告生成中，这是模拟功能');
+  const generatePDF = async () => {
+    if (!reportRef.current || !report) return;
+    
+    setPdfGenerating(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 20;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 10;
+      
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - 20;
+      
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + 10;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - 20;
+      }
+      
+      const fileName = `${report.patient.name}_${report.taskId}_模拟报告.pdf`;
+      pdf.save(fileName);
+    } catch (e) {
+      console.error('PDF生成失败:', e);
+      alert('PDF生成失败，请重试');
+    } finally {
+      setPdfGenerating(false);
+    }
   };
   
   if (loading) {
@@ -196,6 +245,16 @@ export default function ReportPreview() {
           <p className="text-sm text-slate-500">
             生成时间：{new Date(report.generatedAt).toLocaleString('zh-CN')}
           </p>
+          {report.imageName && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+              <FileImage className="w-4 h-4 text-primary" />
+              <span className="text-sm text-slate-600">病理影像：</span>
+              <span className="text-sm font-medium text-slate-800">{report.imageName}</span>
+              <span className="px-2 py-0.5 bg-success/10 text-success text-xs font-medium rounded">
+                已绑定
+              </span>
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-4 gap-4 mb-8">
@@ -293,7 +352,7 @@ export default function ReportPreview() {
       
       <div className="bg-white rounded-xl shadow-card p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4">数据导出</h3>
-        <div className="flex items-end gap-4">
+        <div className="flex items-end gap-4 flex-wrap">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">导出分期</label>
             <select
@@ -305,6 +364,21 @@ export default function ReportPreview() {
               <option value="early">早期</option>
               <option value="middle">中期</option>
               <option value="late">晚期</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">治疗方案</label>
+            <select
+              value={exportVersion}
+              onChange={(e) => setExportVersion(e.target.value)}
+              className="px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary min-w-44"
+            >
+              <option value="latest">当前方案 (最新)</option>
+              {report?.simulationHistory?.map(h => (
+                <option key={h.version} value={h.version}>
+                  方案 v{h.version} - {h.treatmentPlan.chemotherapy.map(c => c.drug).join('+') || '无化疗'}
+                </option>
+              ))}
             </select>
           </div>
           <div>
